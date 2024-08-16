@@ -1,4 +1,6 @@
 from odoo import fields, models, api, exceptions
+from odoo.tools.float_utils import float_compare
+
 import datetime
 
 class EstateProperty(models.Model):
@@ -23,8 +25,8 @@ class EstateProperty(models.Model):
     active = fields.Boolean('Active', default = True)
 
     state = fields.Selection(string='State',
-        selection=[('new', ' New'), ('offer received ', 'Offer Received'), ('offer accepted', 'Offer Accepted'), ('sold', 'Sold'), ('cancelled', 'Cancelled')],
-        help="Property State")
+        selection=[('new', ' New'), ('offer received', 'Offer Received'), ('offer accepted', 'Offer Accepted'), ('sold', 'Sold'), ('cancelled', 'Cancelled')],
+        help="Property State", default = 'new', store=True, readonly= True, compute="_compute_offer_received")
     
     property_type_id = fields.Many2one(comodel_name="estate.property.type", string="Property type")
     buyer_id = fields.Many2one(comodel_name="res.partner", string="Buyer", readonly= True)
@@ -33,9 +35,32 @@ class EstateProperty(models.Model):
     offer_ids = fields.One2many("estate.property.offer", "property_id", string="Offer")
     total_area = fields.Float(compute="_compute_total_area")
     best_price = fields.Float(compute="_compute_best_price")
-    property_status = fields.Selection(string='Status',
-        selection=[('sold', 'Sold'), ('cancel', 'Cancelled'), ('new', 'New')], readonly= True, default= 'new')
     
+    _sql_constraints = [
+        ('expected_price_pos', 'CHECK(expected_price > 0)', 'Expected price should be positive'),
+        ('selling_price_pos', 'CHECK(selling_price > 0)', 'Selling price should be positive'),
+    ]
+    
+    
+    @api.constrains('selling_price','expected_price')
+    def selling_price_constraints(self):
+        if self.state == 'new' or self.state == 'offer received' or not self.selling_price:
+            return
+        
+        for record in self:
+            x = float_compare(100 * record.selling_price , 90 * record.expected_price, precision_digits=5)
+            if x == -1:
+                raise exceptions.ValidationError("Selling price cannot be this low maaan, please respect")
+    
+    
+    @api.depends('offer_ids')
+    def _compute_offer_received(self):
+        print("curr state")
+        for record in self:
+            if record.state == 'new' and record.offer_ids and len(record.offer_ids) > 0: 
+                record.state = 'offer received'
+        return
+            
     
     @api.depends("garden_area", "living_area")
     def _compute_total_area(self):
@@ -63,14 +88,14 @@ class EstateProperty(models.Model):
         
         
     def sold_action(self):
-        if self.property_status == 'cancel':
+        if self.state == 'cancel':
             raise exceptions.UserError("Cancelled properties cannot be sold")
         
-        self.property_status = 'sold'
+        self.state = 'sold'
         
     
     def cancel_action(self):
-        if self.property_status == 'sold':
+        if self.state == 'sold':
             raise exceptions.UserError("Sold properties cannot be cancelled")
         
-        self.property_status = 'cancel'
+        self.state = 'cancel'
