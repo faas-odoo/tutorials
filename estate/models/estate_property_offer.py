@@ -11,13 +11,21 @@ class EstatePropertyOffer(models.Model):
     property_id = fields.Many2one(comodel_name="estate.property", string="Property", required = True)
     validity = fields.Integer('Validity', default = 7)
     date_deadline = fields.Date(string='Deadline', compute='_deadline_compute', inverse = '_inverse_validity')
-
+    property_type_id = fields.Many2one(related="property_id.property_type_id", store = True)
+    _order = "price desc"
+    
     _sql_constraints = [
         ('check_offer_price', 'CHECK(price >= 0)',
          'The offer price should be > 0')
     ]
     
+    @api.model
+    def create(self, vals):
+        if self.env['estate.property'].browse(vals['property_id']).best_price >= vals['price']:
+            raise exceptions.UserError("Greater offer already exists!")
+        return super(EstatePropertyOffer, self).create(vals)
     
+        
     @api.depends("validity", "create_date")
     def _deadline_compute(self):
         for record in self:

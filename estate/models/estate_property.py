@@ -35,11 +35,19 @@ class EstateProperty(models.Model):
     offer_ids = fields.One2many("estate.property.offer", "property_id", string="Offer")
     total_area = fields.Float(compute="_compute_total_area")
     best_price = fields.Float(compute="_compute_best_price")
+    _order = "id desc"
     
     _sql_constraints = [
         ('expected_price_pos', 'CHECK(expected_price > 0)', 'Expected price should be positive'),
         ('selling_price_pos', 'CHECK(selling_price > 0)', 'Selling price should be positive'),
     ]
+    
+    
+    @api.ondelete(at_uninstall=False)
+    def _unlink_except_active_properties(self):
+        for record in self:
+            if record.state not in ['new', 'cancelled']:
+                raise exceptions.UserError("Can't delete an active property!")
     
     
     @api.constrains('selling_price','expected_price')
@@ -55,7 +63,6 @@ class EstateProperty(models.Model):
     
     @api.depends('offer_ids')
     def _compute_offer_received(self):
-        print("curr state")
         for record in self:
             if record.state == 'new' and record.offer_ids and len(record.offer_ids) > 0: 
                 record.state = 'offer received'
