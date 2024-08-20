@@ -1,11 +1,13 @@
 from odoo import fields, models, api, exceptions
 from odoo.tools.float_utils import float_compare
+import logging
 
 import datetime
 
 class EstateProperty(models.Model):
     _name = "estate.property"
     _description = "Real Estate properties"
+    _inherit = ['mail.thread', 'mail.activity.mixin']
     name = fields.Char('Title', required = True)
     description = fields.Text('Description')
     postcode = fields.Char('Postcode')
@@ -98,6 +100,7 @@ class EstateProperty(models.Model):
         if self.state == 'cancel':
             raise exceptions.UserError("Cancelled properties cannot be sold")
         
+        print("sold 1 called")
         self.state = 'sold'
         
     

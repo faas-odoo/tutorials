@@ -4,7 +4,7 @@
     'version': '0.1',
     'application': True,
     'installable': True,
-    'depends': ['base'],
+    'depends': ['base','mail'],
     'data': [
         'security/ir.model.access.csv',
         'views/estate_views.xml',
